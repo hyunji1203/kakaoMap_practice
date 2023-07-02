@@ -4,18 +4,20 @@ import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat.requestPermissions
+import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
+import androidx.core.content.ContextCompat.checkSelfPermission
 import com.example.map_practice.databinding.ActivityMainBinding
 import net.daum.mf.map.api.MapPOIItem
 import net.daum.mf.map.api.MapPoint
@@ -34,6 +36,8 @@ class MainActivity : AppCompatActivity() {
 
         if (checkLocationService()) {
             permissionCheck()
+            // startTracking()
+            // putDestinationMarker()
         } else {
             Toast.makeText(this, "GPS를 켜주세요", Toast.LENGTH_LONG).show()
         }
@@ -42,29 +46,23 @@ class MainActivity : AppCompatActivity() {
     private fun permissionCheck() {
         val preference = getPreferences(Context.MODE_PRIVATE)
         val isFirstCheck = preference.getBoolean("isFirstPermissionCheck", true)
-        if (ContextCompat.checkSelfPermission(
-                this,
-                ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, ACCESS_FINE_LOCATION)) {
+        if (checkSelfPermission(this, ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+            if (shouldShowRequestPermissionRationale(this, ACCESS_FINE_LOCATION)) {
                 val builder = AlertDialog.Builder(this)
                 builder.setMessage("현재 위치를 확인하시려면 위치 권한을 허용해주세요.")
                 builder.setPositiveButton("확인") { dialog, which ->
-                    ActivityCompat.requestPermissions(
+                    requestPermissions(
                         this,
                         arrayOf(ACCESS_FINE_LOCATION),
                         ACCESS_FINE_LOCATION_CODE
                     )
                 }
-                builder.setNegativeButton("취소") { dialog, which ->
-
-                }
+                builder.setNegativeButton("취소") { _, _ -> }
                 builder.show()
             } else {
                 if (isFirstCheck) {
                     preference.edit().putBoolean("isFirstPermissionCheck", false).apply()
-                    ActivityCompat.requestPermissions(
+                    requestPermissions(
                         this,
                         arrayOf(ACCESS_FINE_LOCATION),
                         ACCESS_FINE_LOCATION_CODE
@@ -79,12 +77,13 @@ class MainActivity : AppCompatActivity() {
                         )
                         startActivity(intent)
                     }
-                    builder.setNegativeButton("취소") { dialog, which -> }
+                    builder.setNegativeButton("취소") { _, _ -> }
                     builder.show()
                 }
             }
         } else {
             startTracking()
+            putDestinationMarker()
         }
     }
 
@@ -95,7 +94,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == ACCESS_FINE_LOCATION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PERMISSION_GRANTED) {
                 Toast.makeText(this, "위치 권한이 승인되었습니다.", Toast.LENGTH_LONG).show()
                 startTracking()
             } else {
@@ -115,29 +114,52 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.currentLocationTrackingMode =
             MapView.CurrentLocationTrackingMode.TrackingModeOnWithoutHeading
 
-        val lm: LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 0f, locationListener)
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        locationManager.requestLocationUpdates(
+            LocationManager.NETWORK_PROVIDER,
+            0L,
+            0f,
+            locationListener
+        )
     }
 
     // 위치 리스너
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            val uNowPosition = MapPoint.mapPointWithGeoCoord(location.latitude, location.longitude)
+            Log.d("test", "lat: ${location.latitude}, long: ${location.longitude}")
+            val userNowPosition = MapPoint.mapPointWithGeoCoord(location.latitude, location.longitude)
 
             // 현 위치에 마커 찍기
             val marker = MapPOIItem()
-            marker.itemName = "현 위치"
-            marker.mapPoint = uNowPosition
-            marker.markerType = MapPOIItem.MarkerType.BluePin
-            marker.selectedMarkerType = MapPOIItem.MarkerType.RedPin
+            marker.apply {
+                itemName = "현 위치"
+                mapPoint = userNowPosition
+                markerType = MapPOIItem.MarkerType.BluePin
+                selectedMarkerType = MapPOIItem.MarkerType.RedPin
+            }
             binding.mapView.addPOIItem(marker)
 
-            mapView.setMapCenterPoint(uNowPosition, true) // 지도 화면 업데이트
+            mapView.setMapCenterPoint(userNowPosition, true) // 지도 화면 업데이트
         }
 
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
         override fun onProviderEnabled(provider: String) {}
         override fun onProviderDisabled(provider: String) {}
+    }
+
+    private fun putDestinationMarker() {
+        val marker = MapPOIItem()
+        marker.apply {
+            itemName = "목적지 위치"
+            mapPoint = MapPoint.mapPointWithGeoCoord(37.5524, 127.1668)
+            markerType = MapPOIItem.MarkerType.CustomImage
+            customImageResourceId = R.drawable.destination
+            selectedMarkerType = MapPOIItem.MarkerType.CustomImage
+            customSelectedImageResourceId = R.drawable.destination
+            isCustomImageAutoscale = false
+            setCustomImageAnchor(0.5f, 1.0f)
+        }
+        mapView.addPOIItem(marker)
     }
 
     // 위치추적 중지
