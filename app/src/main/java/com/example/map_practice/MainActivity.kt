@@ -82,8 +82,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
+            mapView.setZoomLevel(2, true)
             startTracking()
             putDestinationMarker()
+            mapView.zoomIn(true)
+            mapView.zoomOut(true)
         }
     }
 
@@ -150,13 +153,13 @@ class MainActivity : AppCompatActivity() {
     private fun putDestinationMarker() {
         val marker = MapPOIItem()
         marker.apply {
-            itemName = "목적지 위치"
+            itemName = "목적지"
             mapPoint = MapPoint.mapPointWithGeoCoord(37.5524, 127.1668)
             markerType = MapPOIItem.MarkerType.CustomImage
-            customImageResourceId = R.drawable.destination
+            customImageResourceId = R.drawable.marker
             selectedMarkerType = MapPOIItem.MarkerType.CustomImage
-            customSelectedImageResourceId = R.drawable.destination
-            isCustomImageAutoscale = false
+            customSelectedImageResourceId = R.drawable.clickedmarker
+            isCustomImageAutoscale = true
             setCustomImageAnchor(0.5f, 1.0f)
         }
         mapView.addPOIItem(marker)
